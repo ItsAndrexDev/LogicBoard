@@ -1,6 +1,6 @@
 ﻿  Main.cpp
-C:\Users\simon\Desktop\LogicBoard\Logicboard\Main.cpp(138,37): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
-C:\Users\simon\Desktop\LogicBoard\Logicboard\Main.cpp(139,37): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\simon\Desktop\LogicBoard\Logicboard\Main.cpp(52,33): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\simon\Desktop\LogicBoard\Logicboard\Main.cpp(53,33): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
   Logicboard.vcxproj -> C:\Users\simon\Desktop\LogicBoard\x64\Debug\Logicboard.exe
   'pwsh.exe' is not recognized as an internal or external command,
   operable program or batch file.

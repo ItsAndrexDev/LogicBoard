@@ -15,8 +15,7 @@ namespace Chess {
     struct Position {
         int x;
         int y;
-
-        Position() : x(-1), y(-1) {}
+		Position() : x(-1), y(-1) {}
         Position(int x, int y) : x(x), y(y) {}
         bool operator==(const Position& other) const { return x == other.x && y == other.y; }
     };

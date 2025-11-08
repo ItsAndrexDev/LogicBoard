@@ -25,9 +25,41 @@ Chess::Board chessBoard;
 std::vector<Renderer::VertexObject> tileVertexObjects;
 std::vector<std::unique_ptr<Chess::Piece>> takenPieces;
 Renderer::VertexObject draggedPieceVertexObject;
-std::optional<Chess::Position> draggedFromPos;
-std::optional<Chess::Position> draggedToPos;
+Chess::Position draggedFromPos;
+Chess::Position draggedToPos;
 bool isDragging = false;
+
+inline void drawDragging(int width, int height, double xpos, double ypos) {
+    for (int y = 0; y < GRID_SIZE; y++) {
+        for (int x = 0; x < GRID_SIZE; x++) {
+            Chess::Piece* piece = chessBoard.getPiece(x, y);
+            if (piece->getType() == Chess::PieceType::EMPTY)
+                continue;
+            if (x == draggedFromPos.x && y == draggedFromPos.y) {
+                std::string texturePath = "Rendering/Assets/";
+                texturePath += (piece->getColor() == Chess::PieceColor::WHITE ? "w" : "b");
+                switch (piece->getType()) {
+                case Chess::PieceType::PAWN:   texturePath += "p.png";   break;
+                case Chess::PieceType::ROOK:   texturePath += "r.png";   break;
+                case Chess::PieceType::KNIGHT: texturePath += "n.png"; break;
+                case Chess::PieceType::BISHOP: texturePath += "b.png"; break;
+                case Chess::PieceType::QUEEN:  texturePath += "q.png";  break;
+                case Chess::PieceType::KING:   texturePath += "k.png";   break;
+                default: continue;
+                }
+                float aspect = static_cast<float>(width) / static_cast<float>(height);
+
+                float xposWorld = ((xpos / width) * 2.0f - 1.0f) * aspect - tileSize / 2.0f;
+                float yposWorld = 1.0f - (ypos / height) * 2.0f - tileSize / 2.0f;
+
+                draggedPieceVertexObject = renderer->setupQuad(
+                    xposWorld, yposWorld, tileSize, tileSize, texturePath.c_str()
+                );
+            }
+        }
+    }
+}
+
 
 Chess::Position screenToWorld(double mouseX, double mouseY, int windowWidth, int windowHeight) {
     // 1. Normalize Mouse Coordinates (0.0 to 1.0)
@@ -82,30 +114,33 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 			chessBoard.getPiece(worldPos.x, worldPos.y)->getType() != Chess::PieceType::EMPTY &&
             chessBoard.currentTurn == chessBoard.getPiece(worldPos.x, worldPos.y)->getColor())
         {
+			std::cout << "Grabbing\n";
 			draggedFromPos = worldPos;
-			draggedToPos = worldPos;
+            draggedToPos = worldPos;
 			isDragging = true;
 			chessBoard.getPiece(worldPos.x, worldPos.y)->isVisible = false;
+			drawDragging(width, height, xpos, ypos);
         }
     }
 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+        if (draggedFromPos == draggedToPos)
+            return;
+	    if (draggedFromPos.x == draggedToPos.x && draggedFromPos.y == draggedToPos.y)
+            return;
         isDragging = false;
-        if (draggedFromPos.has_value())
-            if (draggedToPos.has_value()) {
-				if (draggedFromPos->x == draggedToPos->x && draggedFromPos->y == draggedToPos->y) return;
-                chessBoard.getPiece(draggedFromPos->x, draggedFromPos->y)->isVisible = true;
-                chessBoard.makeMove(*draggedFromPos, *draggedToPos, takenPieces);
-                draggedPieceVertexObject = renderer->setupQuad(0, 0, 0, 0);
+        std::cout << "Releasing\n";
+        chessBoard.getPiece(draggedFromPos.x, draggedFromPos.y)->isVisible = true;
+        chessBoard.makeMove(draggedFromPos, draggedToPos, takenPieces);
+        draggedPieceVertexObject = renderer->setupQuad(0, 0, 0, 0);
+        draggedFromPos = Chess::Position();
+		draggedToPos = Chess::Position();
 
-            }
-        draggedFromPos.reset();
-        draggedToPos.reset();
     }
 }
 
 void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (!draggedFromPos.has_value())
+    if (draggedFromPos.x == -1 && draggedFromPos.y == -1)
         return;
     if(!isDragging)
 		return;
@@ -116,34 +151,8 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
     glfwGetFramebufferSize(window, &width, &height);
     Chess::Position worldPos = screenToWorld(xpos, ypos, width, height);
     if (worldPos.x >= 0 && worldPos.y >= 0) {
-        for (int y = 0; y < GRID_SIZE; y++) {
-            for (int x = 0; x < GRID_SIZE; x++) {
-                Chess::Piece* piece = chessBoard.getPiece(x, y);
-                if (piece->getType() == Chess::PieceType::EMPTY)
-                    continue;
-                if (x == draggedFromPos->x && y == draggedFromPos->y) {
-                    std::string texturePath = "Rendering/Assets/";
-                    texturePath += (piece->getColor() == Chess::PieceColor::WHITE ? "w" : "b");
-                    switch (piece->getType()) {
-                    case Chess::PieceType::PAWN:   texturePath += "p.png";   break;
-                    case Chess::PieceType::ROOK:   texturePath += "r.png";   break;
-                    case Chess::PieceType::KNIGHT: texturePath += "n.png"; break;
-                    case Chess::PieceType::BISHOP: texturePath += "b.png"; break;
-                    case Chess::PieceType::QUEEN:  texturePath += "q.png";  break;
-                    case Chess::PieceType::KING:   texturePath += "k.png";   break;
-                    default: continue;
-                    }
-                    float aspect = static_cast<float>(width) / static_cast<float>(height);
-
-                    float xposWorld = ((xpos / width) * 2.0f - 1.0f) * aspect - tileSize / 2.0f;
-                    float yposWorld = 1.0f - (ypos / height) * 2.0f - tileSize / 2.0f;
-                    
-                    draggedPieceVertexObject = renderer->setupQuad(
-                        xposWorld, yposWorld, tileSize, tileSize, texturePath.c_str()
-                    );
-                }
-            }
-        }
+        drawDragging(width,height,xpos,ypos);
+        std::cout << "Dragging\n";
         draggedToPos = worldPos;
 
     }
@@ -218,7 +227,7 @@ int main() {
     // --- Setup board once ---
     for (int y = 0; y < GRID_SIZE; y++) {
         for (int x = 0; x < GRID_SIZE; x++) {
-            bool isWhite = (x + y) % 2 == 0;
+            bool isWhite = (x + y) % 2 == 1;
             float xpos = -1.0f + x * tileSize;
             float ypos = -1.0f + y * tileSize;
 
@@ -298,7 +307,6 @@ int main() {
 
         for(int y = 0; y < GRID_SIZE; y++) {
             for(int x = 0; x < GRID_SIZE; x++) {
-                bool isWhite = (x + y) % 2 == 0;
                 float xpos = -1.0f + x * tileSize;
                 float ypos = -1.0f + y * tileSize;
 

@@ -99,42 +99,42 @@ void Board::resetBoard() {
 
     // Place pawns
     for (int x = 0; x < 8; ++x) {
-        grid[x][1] = std::make_unique<Pawn>(PieceColor::BLACK, this);
-        grid[x][6] = std::make_unique<Pawn>(PieceColor::WHITE, this);
+        grid[x][1] = std::make_unique<Pawn>(PieceColor::WHITE, this);
+        grid[x][6] = std::make_unique<Pawn>(PieceColor::BLACK, this);
     }
 
     // Place rooks
-    grid[0][0] = std::make_unique<Rook>(PieceColor::BLACK, this);
-    grid[7][0] = std::make_unique<Rook>(PieceColor::BLACK, this);
-    grid[0][7] = std::make_unique<Rook>(PieceColor::WHITE, this);
-    grid[7][7] = std::make_unique<Rook>(PieceColor::WHITE, this);
+    grid[0][0] = std::make_unique<Rook>(PieceColor::WHITE, this);
+    grid[7][0] = std::make_unique<Rook>(PieceColor::WHITE, this);
+    grid[0][7] = std::make_unique<Rook>(PieceColor::BLACK, this);
+    grid[7][7] = std::make_unique<Rook>(PieceColor::BLACK, this);
 
     // Knights
-    grid[1][0] = std::make_unique<Knight>(PieceColor::BLACK, this);
-    grid[6][0] = std::make_unique<Knight>(PieceColor::BLACK, this);
-    grid[1][7] = std::make_unique<Knight>(PieceColor::WHITE, this);
-    grid[6][7] = std::make_unique<Knight>(PieceColor::WHITE, this);
+    grid[1][0] = std::make_unique<Knight>(PieceColor::WHITE, this);
+    grid[6][0] = std::make_unique<Knight>(PieceColor::WHITE, this);
+    grid[1][7] = std::make_unique<Knight>(PieceColor::BLACK, this);
+    grid[6][7] = std::make_unique<Knight>(PieceColor::BLACK, this);
 
     // Bishops
-    grid[2][0] = std::make_unique<Bishop>(PieceColor::BLACK, this);
-    grid[5][0] = std::make_unique<Bishop>(PieceColor::BLACK, this);
-    grid[2][7] = std::make_unique<Bishop>(PieceColor::WHITE, this);
-    grid[5][7] = std::make_unique<Bishop>(PieceColor::WHITE, this);
+    grid[2][0] = std::make_unique<Bishop>(PieceColor::WHITE, this);
+    grid[5][0] = std::make_unique<Bishop>(PieceColor::WHITE, this);
+    grid[2][7] = std::make_unique<Bishop>(PieceColor::BLACK, this);
+    grid[5][7] = std::make_unique<Bishop>(PieceColor::BLACK, this);
 
     // Queens
-    grid[3][0] = std::make_unique<Queen>(PieceColor::BLACK, this);
-    grid[3][7] = std::make_unique<Queen>(PieceColor::WHITE, this);
+    grid[3][0] = std::make_unique<Queen>(PieceColor::WHITE, this);
+    grid[3][7] = std::make_unique<Queen>(PieceColor::BLACK, this);
 
     // Kings
-    grid[4][0] = std::make_unique<King>(PieceColor::BLACK, this);
-    grid[4][7] = std::make_unique<King>(PieceColor::WHITE, this);
+    grid[4][0] = std::make_unique<King>(PieceColor::WHITE, this);
+    grid[4][7] = std::make_unique<King>(PieceColor::BLACK, this);
 }
 
 // ---------------- Pawn ----------------
 std::vector<Move> Pawn::getLegalMoves(const Position& from) const {
     std::vector<Move> moves;
 
-    int dir = (color == PieceColor::WHITE) ? -1 : 1; // Assuming White moves toward lower Y indices (0-7 indexing)
+    int dir = (color == PieceColor::WHITE) ? 1 : -1;
 
     // --- 1. One-Square Forward Move ---
     Position oneAhead(from.x, from.y + dir); // Move changes the Y-coordinate (row)
@@ -144,12 +144,9 @@ std::vector<Move> Pawn::getLegalMoves(const Position& from) const {
     {
         moves.emplace_back(from, oneAhead);
 
-        // --- 2. Two-Square Forward Move (First move only) ---
-        // White starts on rank 6 (index y=6) if dir is -1, or rank 1 (index y=1) if dir is +1.
-        // Let's assume **White starts at y=6** and **Black starts at y=1** based on dir = (W)?-1:1.
 
-        bool isStartingRank = (color == PieceColor::WHITE && from.y == 6) ||
-            (color == PieceColor::BLACK && from.y == 1);
+        bool isStartingRank = (color == PieceColor::WHITE && from.y == 1) ||
+            (color == PieceColor::BLACK && from.y == 6);
 
         if (isStartingRank) {
             Position twoAhead(from.x, from.y + 2 * dir);
