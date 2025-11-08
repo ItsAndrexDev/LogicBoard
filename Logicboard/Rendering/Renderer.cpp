@@ -74,12 +74,27 @@ Renderer::ShaderRenderer::ShaderRenderer(const char* vertexPath, const char* fra
 }
 
 Renderer::ShaderRenderer::~ShaderRenderer() {
-    glDeleteProgram(shaderProgram);
-    for (const auto& obj : vertexObjs) {
+    // Delete per-frame/scene vertex objects
+    clearVertexObjects();
+
+    // Delete constant objects too (they're used for background/board)
+    for (const auto& obj : constantObjs) {
         if (obj.VAO) glDeleteVertexArrays(1, &obj.VAO);
         if (obj.VBO) glDeleteBuffers(1, &obj.VBO);
         if (obj.EBO) glDeleteBuffers(1, &obj.EBO);
         if (obj.textured && obj.textureID) glDeleteTextures(1, &obj.textureID);
+    }
+    constantObjs.clear();
+
+    // If you have a textureCache, delete those textures now:
+    for (auto& kv : textureCache) {
+        if (kv.second) glDeleteTextures(1, &kv.second);
+    }
+    textureCache.clear();
+
+    if (shaderProgram) {
+        glDeleteProgram(shaderProgram);
+        shaderProgram = 0;
     }
 }
 
@@ -159,6 +174,41 @@ void Renderer::ShaderRenderer::setupQuad(float x, float y, float width, float he
     glBindVertexArray(0);
 }
 
+void Renderer::ShaderRenderer::clearVertexObjects() {
+    // Delete GPU resources for vertexObjs
+    for (const auto& obj : vertexObjs) {
+        if (obj.VAO) glDeleteVertexArrays(1, &obj.VAO);
+        if (obj.VBO) glDeleteBuffers(1, &obj.VBO);
+        if (obj.EBO) glDeleteBuffers(1, &obj.EBO);
+        if (obj.textured && obj.textureID) {
+            // If you are using a texture cache, do NOT delete textures here;
+            // delete cached textures once in destructor. If you don't cache,
+            // deleting here is fine. We'll assume you have textureCache:
+            // glDeleteTextures(1, &obj.textureID);
+        }
+    }
+    vertexObjs.clear();
+}
+
+void Renderer::ShaderRenderer::renderConstants() {
+    glUseProgram(shaderProgram);
+    for (const auto& obj : constantObjs) {
+        glUniform1i(glGetUniformLocation(shaderProgram, "useTexture"), obj.textured ? 1 : 0);
+        if (obj.textured) {
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, obj.textureID);
+            glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0); // texture unit 0
+        }
+        glBindVertexArray(obj.VAO);
+        if (obj.EBO)
+            glDrawElements(obj.type, obj.vertexCount, GL_UNSIGNED_INT, 0);
+        else
+            glDrawArrays(obj.type, 0, obj.vertexCount);
+        glBindVertexArray(0);
+    }
+}
+
+
 void Renderer::ShaderRenderer::render() {
     glUseProgram(shaderProgram);
     for (const auto& obj : vertexObjs) {
@@ -196,7 +246,7 @@ void Renderer::ShaderRenderer::setupColoredRect(float x, float y, float width, f
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
 
-    vertexObjs.push_back({ VAO, VBO, EBO, GL_TRIANGLES, 6, false, 0 });
+    constantObjs.push_back({ VAO, VBO, EBO, GL_TRIANGLES, 6, false, 0 });
 
     glBindVertexArray(VAO);
 
@@ -218,30 +268,27 @@ void Renderer::ShaderRenderer::setupColoredRect(float x, float y, float width, f
 
 
 GLuint Renderer::ShaderRenderer::loadTexture(const char* path) {
+    if (textureCache.contains(path))
+        return textureCache[path];
+
     int width, height, channels;
     unsigned char* data = stbi_load(path, &width, &height, &channels, 4);
-    if (!data) {
-        std::cerr << "Failed to load texture: " << path << std::endl;
-        return 0;
-    }
+    if (!data) { std::cerr << "Failed to load texture: " << path << std::endl; return 0; }
 
-    GLuint texture = 0;
+    GLuint texture;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
-
-    // upload
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
     stbi_image_free(data);
-
-    // params
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // clamp to edge (no wrap repeat for sprites)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+    textureCache[path] = texture;
     return texture;
+
 }
 
 // --- Uniform utilities ---

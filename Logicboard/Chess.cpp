@@ -5,58 +5,54 @@ Board::Board() {
     resetBoard();
 }
 
-Board::~Board() {
-    for (int x = 0; x < 8; ++x)
-        for (int y = 0; y < 8; ++y)
-            grid[x][y] = new EmptyPiece(this);
-}
-
 void Board::makeMove(Position from, Position to) {
-	auto* piece = this->getPiece(to.x, to.y);
-	std::vector<Move> legalMoves = piece->getLegalMoves(from);
-    /*if (legalMoves.size() == 0) {
-        return; // Invalid move
-	}*/
-	grid[from.x][from.y] = new EmptyPiece(this);
-	grid[to.x][to.y] = piece;
+    auto& piece = grid[from.x][from.y];
+    auto& dest = grid[to.x][to.y];
+
+    // Capturing replaces the unique_ptr, old one is automatically deleted
+    dest = std::move(piece);
+
+    // Leave an empty piece at the original square
+    piece = std::make_unique<EmptyPiece>(this);
 }
 
 void Board::resetBoard() {
+    // Fill everything with empty pieces first
     for (int x = 0; x < 8; ++x)
         for (int y = 0; y < 8; ++y)
-            grid[x][y] = new EmptyPiece(this);
+            grid[x][y] = std::make_unique<EmptyPiece>(this);
+
     // Place pawns
     for (int x = 0; x < 8; ++x) {
-        grid[x][1] = new Pawn(PieceColor::BLACK, this);
-        grid[x][6] = new Pawn(PieceColor::WHITE, this);
+        grid[x][1] = std::make_unique<Pawn>(PieceColor::BLACK, this);
+        grid[x][6] = std::make_unique<Pawn>(PieceColor::WHITE, this);
     }
 
     // Place rooks
-    grid[0][0] = new Rook(PieceColor::BLACK, this);
-    grid[7][0] = new Rook(PieceColor::BLACK, this);
-    grid[0][7] = new Rook(PieceColor::WHITE, this);
-    grid[7][7] = new Rook(PieceColor::WHITE, this);
+    grid[0][0] = std::make_unique<Rook>(PieceColor::BLACK, this);
+    grid[7][0] = std::make_unique<Rook>(PieceColor::BLACK, this);
+    grid[0][7] = std::make_unique<Rook>(PieceColor::WHITE, this);
+    grid[7][7] = std::make_unique<Rook>(PieceColor::WHITE, this);
 
     // Knights
-    grid[1][0] = new Knight(PieceColor::BLACK, this);
-    grid[6][0] = new Knight(PieceColor::BLACK, this);
-    grid[1][7] = new Knight(PieceColor::WHITE, this);
-    grid[6][7] = new Knight(PieceColor::WHITE, this);
+    grid[1][0] = std::make_unique<Knight>(PieceColor::BLACK, this);
+    grid[6][0] = std::make_unique<Knight>(PieceColor::BLACK, this);
+    grid[1][7] = std::make_unique<Knight>(PieceColor::WHITE, this);
+    grid[6][7] = std::make_unique<Knight>(PieceColor::WHITE, this);
 
     // Bishops
-    grid[2][0] = new Bishop(PieceColor::BLACK, this);
-    grid[5][0] = new Bishop(PieceColor::BLACK, this);
-    grid[2][7] = new Bishop(PieceColor::WHITE, this);
-    grid[5][7] = new Bishop(PieceColor::WHITE, this);
+    grid[2][0] = std::make_unique<Bishop>(PieceColor::BLACK, this);
+    grid[5][0] = std::make_unique<Bishop>(PieceColor::BLACK, this);
+    grid[2][7] = std::make_unique<Bishop>(PieceColor::WHITE, this);
+    grid[5][7] = std::make_unique<Bishop>(PieceColor::WHITE, this);
 
     // Queens
-    grid[3][0] = new Queen(PieceColor::BLACK, this);
-    grid[3][7] = new Queen(PieceColor::WHITE, this);
+    grid[3][0] = std::make_unique<Queen>(PieceColor::BLACK, this);
+    grid[3][7] = std::make_unique<Queen>(PieceColor::WHITE, this);
 
     // Kings
-    grid[4][0] = new King(PieceColor::BLACK, this);
-    grid[4][7] = new King(PieceColor::WHITE, this);
-
+    grid[4][0] = std::make_unique<King>(PieceColor::BLACK, this);
+    grid[4][7] = std::make_unique<King>(PieceColor::WHITE, this);
 }
 
 // ---------------- Pawn ----------------
@@ -88,7 +84,7 @@ std::vector<Move> Knight::getLegalMoves(const Position& from) const {
         {2, 1}, {1, 2}, {-1, 2}, {-2, 1},
         {-2, -1}, {-1, -2}, {1, -2}, {2, -1}
     };
-    
+
     for (auto [dx, dy] : offsets) {
         Position to(from.x + dx, from.y + dy);
         if (OwningBoard->isInside(to.x, to.y)) {

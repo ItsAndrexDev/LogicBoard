@@ -1,7 +1,9 @@
 #pragma once
 #include <vector>
 #include <array>
+#include <memory>
 #include "Rendering/Renderer.hpp"
+
 namespace Chess {
 
     enum class PieceType { EMPTY = 0, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING };
@@ -23,10 +25,7 @@ namespace Chess {
         MoveType type;
         PieceType promotion;
 
-        Move()
-            : from(), to(), type(MoveType::NORMAL), promotion(PieceType::EMPTY) {
-        }
-
+        Move() : from(), to(), type(MoveType::NORMAL), promotion(PieceType::EMPTY) {}
         Move(Position f, Position t, MoveType mt = MoveType::NORMAL, PieceType promo = PieceType::EMPTY)
             : from(f), to(t), type(mt), promotion(promo) {
         }
@@ -102,14 +101,14 @@ namespace Chess {
     // ------------------- Board -------------------
     class Board {
     public:
-        std::array<std::array<Piece*, 8>, 8> grid;
+        std::array<std::array<std::unique_ptr<Piece>, 8>, 8> grid;
 
         Board();
-        ~Board();
+        ~Board() = default;
 
         bool isInside(int x, int y) const { return x >= 0 && x < 8 && y >= 0 && y < 8; }
-        Piece* getPiece(int x, int y) const { return grid[x][y]; }
-		void makeMove(Position from, Position to);
+        Piece* getPiece(int x, int y) const { return grid[x][y].get(); }
+        void makeMove(Position from, Position to);
         void resetBoard();
     };
 

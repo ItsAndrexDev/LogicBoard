@@ -58,7 +58,7 @@ int main() {
         std::cerr << "ImGui OpenGL3 init failed!\n";
         return -1;
     }
-
+	glfwSwapInterval(1); // Enable vsync
     Renderer::SetupImGuiStyle();
     Chess::Board chessBoard;
 
@@ -104,7 +104,6 @@ int main() {
             renderer.setupQuad(xpos, ypos, tileSize, tileSize, texturePath.c_str());
         }
     }
-
     // --- Main loop ---
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     while (!glfwWindowShouldClose(window)) {
@@ -133,8 +132,37 @@ int main() {
         float aspect = static_cast<float>(width) / static_cast<float>(height);
         glm::mat4 projection = glm::ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
         glm::mat4 model = glm::mat4(1.0f);
+		renderer.clearVertexObjects();
+        for(int y = 0; y < GRID_SIZE; y++) {
+            for(int x = 0; x < GRID_SIZE; x++) {
+                bool isWhite = (x + y) % 2 == 0;
+                float xpos = -1.0f + x * tileSize;
+                float ypos = -1.0f + y * tileSize;
+
+                Chess::Piece* piece = chessBoard.getPiece(x, y);
+                if (piece->getType() == Chess::PieceType::EMPTY)
+                    continue;
+
+                std::string texturePath = "Rendering/Textures/";
+                texturePath += (piece->getColor() == Chess::PieceColor::WHITE ? "w_" : "b_");
+
+                switch (piece->getType()) {
+                case Chess::PieceType::PAWN:   texturePath += "Pawn.png";   break;
+                case Chess::PieceType::ROOK:   texturePath += "Rook.png";   break;
+                case Chess::PieceType::KNIGHT: texturePath += "Knight.png"; break;
+                case Chess::PieceType::BISHOP: texturePath += "Bishop.png"; break;
+                case Chess::PieceType::QUEEN:  texturePath += "Queen.png";  break;
+                case Chess::PieceType::KING:   texturePath += "King.png";   break;
+                default: continue;
+                }
+
+                renderer.setupQuad(xpos, ypos, tileSize, tileSize, texturePath.c_str());
+            }
+		}
+		std::cout << "Pieces: " << renderer.vertexObjs.size() << std::endl;
         renderer.setUniformMat4("model", model);
         renderer.setUniformMat4("projection", projection);
+        renderer.renderConstants();
         renderer.render();
 
         // --- Render ImGui ---

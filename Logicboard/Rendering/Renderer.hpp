@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <unordered_map>
 struct Vec2 {
     float x, y;
     Vec2(float a = 0, float b = 0)
@@ -50,6 +51,7 @@ namespace Renderer {
         GLuint textureID;
     };
 
+
     GLuint compileShader(const char* path, GLenum type);
     GLuint createShaderProgram(const char* vertexPath, const char* fragmentPath);
 
@@ -62,6 +64,7 @@ namespace Renderer {
         void setupColoredRect(float x, float y, float width, float height, const Vec3& color);
 
         void render();
+		void renderConstants();
 
         // Uniform utilities
         void setUniform1f(const std::string& name, float value);
@@ -70,9 +73,15 @@ namespace Renderer {
 
         GLuint shaderProgram; // kept public since you're accessing it in main
         std::vector<VertexObject> vertexObjs;
-    private:
-        GLFWwindow* window;
+        void clearVertexObjects();
 
+    private:
+        // add these members (public or private as you prefer)
+        GLint locUseTexture = -1;
+        GLint locTex = -1;
+        GLFWwindow* window;
+        std::unordered_map<std::string, GLuint> textureCache;
+		std::vector<VertexObject> constantObjs;
         GLuint loadTexture(const char* path);
     };
 
