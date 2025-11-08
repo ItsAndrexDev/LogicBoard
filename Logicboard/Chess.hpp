@@ -47,6 +47,8 @@ namespace Chess {
         virtual std::vector<Move> getLegalMoves(const Position& from) const = 0;
         PieceColor getColor() const { return color; }
         virtual PieceType getType() const = 0;
+		Renderer::VertexObject vertexObject;
+        bool isVisible = true;
     };
 
     // ------------------- Derived Pieces -------------------
@@ -110,7 +112,10 @@ namespace Chess {
 
         bool isInside(int x, int y) const { return x >= 0 && x < 8 && y >= 0 && y < 8; }
         Piece* getPiece(int x, int y) const { return grid[x][y].get(); }
-        void makeMove(Position from, Position to);
+        void makeMove(Position from, Position to, std::vector<std::unique_ptr<Piece>>& takenPieces);
+        bool isSquareAttacked(Position pos, PieceColor attackerColor) const;
+		Position kingPosition(PieceColor kingColor) const;
+		bool isChecked(PieceColor kingColor) const;
         void resetBoard();
 		PieceColor currentTurn = PieceColor::WHITE;
     };

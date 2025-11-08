@@ -15,10 +15,16 @@
 const int GRID_SIZE = 8;
 float tileSize = 2.0f / GRID_SIZE;
 
+
+std::unique_ptr<Renderer::ShaderRenderer> renderer;
+
+
+
 Chess::Board chessBoard;
 
 std::vector<Renderer::VertexObject> tileVertexObjects;
-std::vector<Renderer::VertexObject> pieceVertexObjects;
+std::vector<std::unique_ptr<Chess::Piece>> takenPieces;
+Renderer::VertexObject draggedPieceVertexObject;
 std::optional<Chess::Position> draggedFromPos;
 std::optional<Chess::Position> draggedToPos;
 bool isDragging = false;
@@ -73,29 +79,28 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
         // Check if the position is valid AND there is a piece
         if (worldPos.x >= 0 && worldPos.y >= 0 &&
-            chessBoard.getPiece(worldPos.x, worldPos.y)->getType() != Chess::PieceType::EMPTY)
+			chessBoard.getPiece(worldPos.x, worldPos.y)->getType() != Chess::PieceType::EMPTY &&
+            chessBoard.currentTurn == chessBoard.getPiece(worldPos.x, worldPos.y)->getColor())
         {
-			std::cout << "Mouse pressed at: " << worldPos.x << ", " << worldPos.y << "\n";
 			draggedFromPos = worldPos;
+			draggedToPos = worldPos;
 			isDragging = true;
+			chessBoard.getPiece(worldPos.x, worldPos.y)->isVisible = false;
         }
     }
 
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
-		std::cout << "Mouse released\n";
-		isDragging = false;
-        if (draggedFromPos.has_value()) 
-            if (draggedToPos.has_value()) 
-				chessBoard.makeMove(*draggedFromPos, *draggedToPos);
-            else {
-                draggedFromPos.reset();
-                draggedToPos.reset();
+        isDragging = false;
+        if (draggedFromPos.has_value())
+            if (draggedToPos.has_value()) {
+				if (draggedFromPos->x == draggedToPos->x && draggedFromPos->y == draggedToPos->y) return;
+                chessBoard.getPiece(draggedFromPos->x, draggedFromPos->y)->isVisible = true;
+                chessBoard.makeMove(*draggedFromPos, *draggedToPos, takenPieces);
+                draggedPieceVertexObject = renderer->setupQuad(0, 0, 0, 0);
+
             }
-        
-        else {
-            draggedFromPos.reset();
-            draggedToPos.reset();
-        }
+        draggedFromPos.reset();
+        draggedToPos.reset();
     }
 }
 
@@ -104,11 +109,43 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
         return;
     if(!isDragging)
 		return;
+
+    
+
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     Chess::Position worldPos = screenToWorld(xpos, ypos, width, height);
     if (worldPos.x >= 0 && worldPos.y >= 0) {
+        for (int y = 0; y < GRID_SIZE; y++) {
+            for (int x = 0; x < GRID_SIZE; x++) {
+                Chess::Piece* piece = chessBoard.getPiece(x, y);
+                if (piece->getType() == Chess::PieceType::EMPTY)
+                    continue;
+                if (x == draggedFromPos->x && y == draggedFromPos->y) {
+                    std::string texturePath = "Rendering/Assets/";
+                    texturePath += (piece->getColor() == Chess::PieceColor::WHITE ? "w" : "b");
+                    switch (piece->getType()) {
+                    case Chess::PieceType::PAWN:   texturePath += "p.png";   break;
+                    case Chess::PieceType::ROOK:   texturePath += "r.png";   break;
+                    case Chess::PieceType::KNIGHT: texturePath += "n.png"; break;
+                    case Chess::PieceType::BISHOP: texturePath += "b.png"; break;
+                    case Chess::PieceType::QUEEN:  texturePath += "q.png";  break;
+                    case Chess::PieceType::KING:   texturePath += "k.png";   break;
+                    default: continue;
+                    }
+                    float aspect = static_cast<float>(width) / static_cast<float>(height);
+
+                    float xposWorld = ((xpos / width) * 2.0f - 1.0f) * aspect - tileSize / 2.0f;
+                    float yposWorld = 1.0f - (ypos / height) * 2.0f - tileSize / 2.0f;
+                    
+                    draggedPieceVertexObject = renderer->setupQuad(
+                        xposWorld, yposWorld, tileSize, tileSize, texturePath.c_str()
+                    );
+                }
+            }
+        }
         draggedToPos = worldPos;
+
     }
     
 }
@@ -172,14 +209,11 @@ int main() {
     Renderer::SetupImGuiStyle();
     
 
-    // --- Load shader ---
-    Renderer::ShaderRenderer renderer(
+    renderer = std::make_unique<Renderer::ShaderRenderer>(
         "Rendering/Shaders/vertex.glsl",
         "Rendering/Shaders/fragment.glsl",
         window
-    );
-
-    
+	);
 
     // --- Setup board once ---
     for (int y = 0; y < GRID_SIZE; y++) {
@@ -187,33 +221,35 @@ int main() {
             bool isWhite = (x + y) % 2 == 0;
             float xpos = -1.0f + x * tileSize;
             float ypos = -1.0f + y * tileSize;
-            
+
             Vec3 color = isWhite
                 ? Vec3(235.0f / 255.0f, 236.0f / 255.0f, 208.0f / 255.0f)
                 : Vec3(115.0f / 255.0f, 149.0f / 255.0f, 82.0f / 255.0f);
 
-            tileVertexObjects.push_back(renderer.setupColoredRect(xpos, ypos, tileSize, tileSize, color));
+            tileVertexObjects.push_back(renderer->setupColoredRect(xpos, ypos, tileSize, tileSize, color));
 
             Chess::Piece* piece = chessBoard.getPiece(x, y);
             if (piece->getType() == Chess::PieceType::EMPTY)
                 continue;
-
+            if (!piece->isVisible)
+                continue;
             std::string texturePath = "Rendering/Assets/";
-            texturePath += (piece->getColor() == Chess::PieceColor::WHITE ? "w_" : "b_");
+            texturePath += (piece->getColor() == Chess::PieceColor::WHITE ? "w" : "b");
 
             switch (piece->getType()) {
-            case Chess::PieceType::PAWN:   texturePath += "Pawn.png";   break;
-            case Chess::PieceType::ROOK:   texturePath += "Rook.png";   break;
-            case Chess::PieceType::KNIGHT: texturePath += "Knight.png"; break;
-            case Chess::PieceType::BISHOP: texturePath += "Bishop.png"; break;
-            case Chess::PieceType::QUEEN:  texturePath += "Queen.png";  break;
-            case Chess::PieceType::KING:   texturePath += "King.png";   break;
+            case Chess::PieceType::PAWN:   texturePath += "p.png";   break;
+            case Chess::PieceType::ROOK:   texturePath += "r.png";   break;
+            case Chess::PieceType::KNIGHT: texturePath += "n.png"; break;
+            case Chess::PieceType::BISHOP: texturePath += "b.png"; break;
+            case Chess::PieceType::QUEEN:  texturePath += "q.png";  break;
+            case Chess::PieceType::KING:   texturePath += "k.png";   break;
             default: continue;
             }
 
-            pieceVertexObjects.push_back(renderer.setupQuad(xpos, ypos, tileSize, tileSize, texturePath.c_str()));
+            piece->vertexObject = renderer->setupQuad(xpos, ypos, tileSize, tileSize, texturePath.c_str());
         }
     }
+
     // --- Main loop ---
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     while (!glfwWindowShouldClose(window)) {
@@ -243,15 +279,23 @@ int main() {
         // Your panel content
         ImGui::Text(chessBoard.currentTurn == Chess::PieceColor::WHITE ?
             "White's Turn!" : "Black's Turn!");
+        if(ImGui::Button("Reset Board")) {
+            chessBoard.resetBoard();
+			takenPieces.clear();
+		}
         ImGui::End();
 
 
         // --- Shader updates ---
-        renderer.setUniform1f("uTime", (float)glfwGetTime());
+        renderer->setUniform1f("uTime", (float)glfwGetTime());
         float aspect = static_cast<float>(width) / static_cast<float>(height);
         glm::mat4 projection = glm::ortho(-aspect, aspect, -1.0f, 1.0f, -1.0f, 1.0f);
         glm::mat4 model = glm::mat4(1.0f);
-		pieceVertexObjects.clear();
+        renderer->setUniformMat4("model", model);
+        renderer->setUniformMat4("projection", projection);
+        renderer->render(tileVertexObjects);
+
+
         for(int y = 0; y < GRID_SIZE; y++) {
             for(int x = 0; x < GRID_SIZE; x++) {
                 bool isWhite = (x + y) % 2 == 0;
@@ -261,27 +305,78 @@ int main() {
                 Chess::Piece* piece = chessBoard.getPiece(x, y);
                 if (piece->getType() == Chess::PieceType::EMPTY)
                     continue;
-
+				if (!piece->isVisible)
+					continue;
                 std::string texturePath = "Rendering/Assets/";
-                texturePath += (piece->getColor() == Chess::PieceColor::WHITE ? "w_" : "b_");
+                texturePath += (piece->getColor() == Chess::PieceColor::WHITE ? "w" : "b");
 
                 switch (piece->getType()) {
-                case Chess::PieceType::PAWN:   texturePath += "Pawn.png";   break;
-                case Chess::PieceType::ROOK:   texturePath += "Rook.png";   break;
-                case Chess::PieceType::KNIGHT: texturePath += "Knight.png"; break;
-                case Chess::PieceType::BISHOP: texturePath += "Bishop.png"; break;
-                case Chess::PieceType::QUEEN:  texturePath += "Queen.png";  break;
-                case Chess::PieceType::KING:   texturePath += "King.png";   break;
+                case Chess::PieceType::PAWN:   texturePath += "p.png";   break;
+                case Chess::PieceType::ROOK:   texturePath += "r.png";   break;
+                case Chess::PieceType::KNIGHT: texturePath += "n.png"; break;
+                case Chess::PieceType::BISHOP: texturePath += "b.png"; break;
+                case Chess::PieceType::QUEEN:  texturePath += "q.png";  break;
+                case Chess::PieceType::KING:   texturePath += "k.png";   break;
                 default: continue;
                 }
 
-                pieceVertexObjects.push_back(renderer.setupQuad(xpos, ypos, tileSize, tileSize, texturePath.c_str()));
+                piece->vertexObject = renderer->setupQuad(xpos, ypos, tileSize, tileSize, texturePath.c_str());
+				renderer->render({ piece->vertexObject });
             }
 		}
-        renderer.setUniformMat4("model", model);
-        renderer.setUniformMat4("projection", projection);
-        renderer.render(tileVertexObjects);
-		renderer.render(pieceVertexObjects);
+        
+        // --- Render taken pieces (right side) ---
+        float pieceDisplaySize = tileSize * 0.5f;
+        float margin = tileSize * 0.8f;
+        float startX = aspect - pieceDisplaySize - margin + 0.2f; // rightmost column
+        float whiteStartY = 1.0f - margin - pieceDisplaySize + 0.2f;  // start near top
+        float blackStartY = -1.0f + margin + pieceDisplaySize - 0.2f; // start near bottom
+        int maxRows = 5; // pieces per column
+
+        int whiteIndex = 0;
+        int blackIndex = 0;
+
+        for (const auto& p : takenPieces) {
+            std::string texturePath = "Rendering/Assets/";
+            texturePath += (p->getColor() == Chess::PieceColor::WHITE ? "w" : "b");
+
+            switch (p->getType()) {
+            case Chess::PieceType::PAWN:   texturePath += "p.png";   break;
+            case Chess::PieceType::ROOK:   texturePath += "r.png";   break;
+            case Chess::PieceType::KNIGHT: texturePath += "n.png"; break;
+            case Chess::PieceType::BISHOP: texturePath += "b.png"; break;
+            case Chess::PieceType::QUEEN:  texturePath += "q.png";  break;
+            case Chess::PieceType::KING:   texturePath += "k.png";   break;
+            default: continue;
+            }
+
+            float x, y;
+
+            if (p->getColor() == Chess::PieceColor::WHITE) {
+                // column and row logic for white pieces
+                int col = whiteIndex / maxRows;
+                int row = whiteIndex % maxRows;
+
+                x = startX - col * pieceDisplaySize * 1.2f;
+                y = whiteStartY - row * pieceDisplaySize * 1.1f;
+                whiteIndex++;
+            }
+            else {
+                // column and row logic for black pieces
+                int col = blackIndex / maxRows;
+                int row = blackIndex % maxRows;
+
+                x = startX - col * pieceDisplaySize * 1.2f;
+                y = blackStartY + row * pieceDisplaySize * 1.1f;
+                blackIndex++;
+            }
+
+            auto vobj = renderer->setupQuad(x, y, pieceDisplaySize, pieceDisplaySize, texturePath.c_str());
+            renderer->render({ vobj });
+        }
+
+        if(isDragging)
+			renderer->render({ draggedPieceVertexObject });
 
         // --- Render ImGui ---
         ImGui::Render();

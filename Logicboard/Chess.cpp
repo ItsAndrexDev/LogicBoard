@@ -6,10 +6,9 @@ Board::Board() {
 	currentTurn = PieceColor::WHITE;
 }
 
-void Board::makeMove(Position from, Position to) {
+void Board::makeMove(Position from, Position to, std::vector<std::unique_ptr<Piece>>& takenPieces) {
     auto& piece = grid[from.x][from.y];
     auto& dest = grid[to.x][to.y];
-
 	if (piece->getColor() != currentTurn) 
 		return;
 
@@ -31,15 +30,66 @@ void Board::makeMove(Position from, Position to) {
         }
 	}
     if (!isLegal) return;
-	
+    if (isChecked(currentTurn)) {
+        // Simulate the move
+        auto capturedPiece = std::move(dest);
+        dest = std::move(piece);
+        piece = std::make_unique<EmptyPiece>(this);
+        bool stillInCheck = isChecked(currentTurn);
+        // Revert the move
+        piece = std::move(dest);
+        dest = std::move(capturedPiece);
+        if (stillInCheck) {
+            std::cout << "Move would leave king in check, illegal move.\n";
+            return; // Move is illegal as it leaves king in check
+		}
+    }
     std::cout << "Move made from (" << from.x << ", " << from.y << ") to ("
 		<< to.x << ", " << to.y << ")\n";
-
+    if(usedMove.type == MoveType::CAPTURE)
+		takenPieces.push_back(std::move(dest));
     dest = std::move(piece);
     // Leave an empty piece at the original square
     piece = std::make_unique<EmptyPiece>(this);
 	currentTurn = (currentTurn == PieceColor::WHITE) ? PieceColor::BLACK : PieceColor::WHITE;
+	std::cout << "taken pieces count: " << takenPieces.size() << "\n";
 }
+
+bool Board::isSquareAttacked(Position pos, PieceColor attackerColor) const {
+    // Iterate over all squares on the board
+    for (int x = 0; x < 8; ++x) {
+        for (int y = 0; y < 8; ++y) {
+            Piece* piece = getPiece(x,y);
+            // Check if the piece belongs to the attacking color
+            if (piece->getColor() == attackerColor) {
+                Position from{x, y};
+                std::vector<Move> moves = piece->getLegalMoves(from);
+                // Check if any of the legal moves target the specified position
+                for (const Move& move : moves) {
+                    if (move.to == pos) {
+                        return true; // The square is attacked
+                    }
+                }
+            }
+        }
+    }
+    return false; // No attacking pieces found
+}
+
+Position Board::kingPosition(PieceColor kingColor) const {
+    for(int x = 0; x < 8; ++x) {
+        for(int y = 0; y < 8; ++y) {
+            Piece* piece = getPiece(x,y);
+            if (piece->getType() == PieceType::KING && piece->getColor() == kingColor) {
+                return Position{x,y};
+            }
+        }
+	}
+}
+bool Board::isChecked(PieceColor kingColor) const {
+    return isSquareAttacked(kingPosition(kingColor),kingColor == PieceColor::WHITE ? PieceColor::BLACK : PieceColor::WHITE);
+}
+
 
 void Board::resetBoard() {
     // Fill everything with empty pieces first
