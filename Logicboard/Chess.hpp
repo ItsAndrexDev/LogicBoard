@@ -10,11 +10,13 @@ namespace Chess {
     enum class PieceColor { NONE = 0, WHITE, BLACK };
     enum class MoveType { NORMAL = 0, CAPTURE, CASTLE, PROMOTION, EN_PASSANT };
 
+	class Board; // Forward declaration
+
     struct Position {
         int x;
         int y;
 
-        Position() : x(0), y(0) {}
+        Position() : x(-1), y(-1) {}
         Position(int x, int y) : x(x), y(y) {}
         bool operator==(const Position& other) const { return x == other.x && y == other.y; }
     };
@@ -31,7 +33,6 @@ namespace Chess {
         }
     };
 
-    class Board; // Forward declaration
 
     // ------------------- Base Piece -------------------
     class Piece {
@@ -106,10 +107,12 @@ namespace Chess {
         Board();
         ~Board() = default;
 
+
         bool isInside(int x, int y) const { return x >= 0 && x < 8 && y >= 0 && y < 8; }
         Piece* getPiece(int x, int y) const { return grid[x][y].get(); }
         void makeMove(Position from, Position to);
         void resetBoard();
+		PieceColor currentTurn = PieceColor::WHITE;
     };
 
 } // namespace Chess

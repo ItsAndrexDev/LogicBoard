@@ -41,6 +41,8 @@ struct Vertex {
 };
 
 namespace Renderer {
+
+
     void SetupImGuiStyle();
 
     struct VertexObject {
@@ -57,14 +59,12 @@ namespace Renderer {
 
     struct ShaderRenderer {
         ShaderRenderer(const char* vertexPath, const char* fragmentPath, GLFWwindow* window);
-        ~ShaderRenderer();
 
-        void setupTriangle(const Vertex& v1, const Vertex& v2, const Vertex& v3);
-        void setupQuad(float x, float y, float width, float height, const char* texturePath = nullptr);
-        void setupColoredRect(float x, float y, float width, float height, const Vec3& color);
+        VertexObject setupTriangle(const Vertex& v1, const Vertex& v2, const Vertex& v3);
+        VertexObject setupQuad(float x, float y, float width, float height, const char* texturePath = nullptr);
+        VertexObject setupColoredRect(float x, float y, float width, float height, const Vec3& color);
 
-        void render();
-		void renderConstants();
+        void render(std::vector<VertexObject> objs);
 
         // Uniform utilities
         void setUniform1f(const std::string& name, float value);
@@ -72,8 +72,7 @@ namespace Renderer {
         void setUniformMat4(const std::string& name, const glm::mat4& mat);
 
         GLuint shaderProgram; // kept public since you're accessing it in main
-        std::vector<VertexObject> vertexObjs;
-        void clearVertexObjects();
+        void clearVertexObjects(std::vector<VertexObject>& objs);
 
     private:
         // add these members (public or private as you prefer)
@@ -81,7 +80,6 @@ namespace Renderer {
         GLint locTex = -1;
         GLFWwindow* window;
         std::unordered_map<std::string, GLuint> textureCache;
-		std::vector<VertexObject> constantObjs;
         GLuint loadTexture(const char* path);
     };
 

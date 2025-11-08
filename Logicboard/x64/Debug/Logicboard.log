@@ -1,9 +1,6 @@
-﻿  Main.cpp
-Z:\andrex\Dev\LogicBoard\Logicboard\Main.cpp(54,30): error C2374: 'renderer': redefinition; multiple initialization
-      Z:\andrex\Dev\LogicBoard\Logicboard\Main.cpp(51,30):
-      see declaration of 'renderer'
-  
-Z:\andrex\Dev\LogicBoard\Logicboard\Main.cpp(54,30): error C2086: 'Renderer::ShaderRenderer renderer': redefinition
-      Z:\andrex\Dev\LogicBoard\Logicboard\Main.cpp(51,30):
-      see declaration of 'renderer'
-  
+﻿  Chess.cpp
+  Main.cpp
+  Generating Code...
+  Logicboard.vcxproj -> C:\Users\simon\Desktop\LogicBoard\x64\Debug\Logicboard.exe
+  'pwsh.exe' is not recognized as an internal or external command,
+  operable program or batch file.

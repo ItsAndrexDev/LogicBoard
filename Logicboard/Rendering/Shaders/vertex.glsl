@@ -13,6 +13,6 @@ uniform mat4 projection;
 void main()
 {
     vColor = aColor;
-    vTexCoord = vec2(aTexCoord.x, 1.0 - aTexCoord.y); // Flip the y-coordinate
+    vTexCoord = vec2(aTexCoord.x, 1.0f - aTexCoord.y); // Flip the y-coordinate
     gl_Position = projection * model * vec4(aPos, 1.0);
 }

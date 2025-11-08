@@ -82,45 +82,48 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Rendering\Textures\b_Bishop.png">
+    <Image Include="Rendering\Assets\b_Bishop.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\b_King.png">
+    <Image Include="Rendering\Assets\b_King.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\b_Knight.png">
+    <Image Include="Rendering\Assets\b_Knight.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\b_Pawn.png">
+    <Image Include="Rendering\Assets\b_Pawn.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\b_Queen.png">
+    <Image Include="Rendering\Assets\b_Queen.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\b_Rook.png">
+    <Image Include="Rendering\Assets\b_Rook.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\w_Bishop.png">
+    <Image Include="Rendering\Assets\w_Bishop.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\w_King.png">
+    <Image Include="Rendering\Assets\w_King.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\w_Knight.png">
+    <Image Include="Rendering\Assets\w_Knight.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\w_Pawn.png">
+    <Image Include="Rendering\Assets\w_Pawn.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\w_Queen.png">
+    <Image Include="Rendering\Assets\w_Queen.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="Rendering\Textures\w_Rook.png">
+    <Image Include="Rendering\Assets\w_Rook.png">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
   <ItemGroup>
     <None Include="Rendering\Shaders\fragment.glsl" />
     <None Include="Rendering\Shaders\vertex.glsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="Rendering\Assets\audio.mp3" />
   </ItemGroup>
 </Project>

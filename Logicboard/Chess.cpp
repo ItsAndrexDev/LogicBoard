@@ -3,17 +3,42 @@ using namespace Chess;
 
 Board::Board() {
     resetBoard();
+	currentTurn = PieceColor::WHITE;
 }
 
 void Board::makeMove(Position from, Position to) {
     auto& piece = grid[from.x][from.y];
     auto& dest = grid[to.x][to.y];
 
-    // Capturing replaces the unique_ptr, old one is automatically deleted
-    dest = std::move(piece);
+	if (piece->getColor() != currentTurn) 
+		return;
 
+    std::vector<Move> legalMoves = piece->getLegalMoves(from);
+	std::cout << "Legal moves for piece at (" << from.x << ", " << from.y << "):\n";
+    for (const Move& move : legalMoves) {
+        std::cout << "  To (" << move.to.x << ", " << move.to.y << ")\n";
+    }
+    if (legalMoves.size() == 0) {
+		return;
+	}
+	Move usedMove;
+	bool isLegal = false;
+    for(const Move& move : legalMoves) {
+        if (move.to == to) {
+			usedMove = move;
+			isLegal = true;
+            break;
+        }
+	}
+    if (!isLegal) return;
+	
+    std::cout << "Move made from (" << from.x << ", " << from.y << ") to ("
+		<< to.x << ", " << to.y << ")\n";
+
+    dest = std::move(piece);
     // Leave an empty piece at the original square
     piece = std::make_unique<EmptyPiece>(this);
+	currentTurn = (currentTurn == PieceColor::WHITE) ? PieceColor::BLACK : PieceColor::WHITE;
 }
 
 void Board::resetBoard() {
@@ -58,22 +83,51 @@ void Board::resetBoard() {
 // ---------------- Pawn ----------------
 std::vector<Move> Pawn::getLegalMoves(const Position& from) const {
     std::vector<Move> moves;
-    int dir = (color == PieceColor::WHITE) ? -1 : 1;
 
-    Position oneAhead(from.x + dir, from.y);
+    int dir = (color == PieceColor::WHITE) ? -1 : 1; // Assuming White moves toward lower Y indices (0-7 indexing)
+
+    // --- 1. One-Square Forward Move ---
+    Position oneAhead(from.x, from.y + dir); // Move changes the Y-coordinate (row)
+
     if (OwningBoard->isInside(oneAhead.x, oneAhead.y) &&
         OwningBoard->getPiece(oneAhead.x, oneAhead.y)->getType() == PieceType::EMPTY)
+    {
         moves.emplace_back(from, oneAhead);
 
-    // Captures
-    for (int dy : {-1, 1}) {
-        Position cap(from.x + dir, from.y + dy);
-        if (OwningBoard->isInside(cap.x, cap.y)) {
-            Piece* target = OwningBoard->getPiece(cap.x, cap.y);
-            if (target->getColor() != color && target->getColor() != PieceColor::NONE)
-                moves.emplace_back(from, cap, MoveType::CAPTURE);
+        // --- 2. Two-Square Forward Move (First move only) ---
+        // White starts on rank 6 (index y=6) if dir is -1, or rank 1 (index y=1) if dir is +1.
+        // Let's assume **White starts at y=6** and **Black starts at y=1** based on dir = (W)?-1:1.
+
+        bool isStartingRank = (color == PieceColor::WHITE && from.y == 6) ||
+            (color == PieceColor::BLACK && from.y == 1);
+
+        if (isStartingRank) {
+            Position twoAhead(from.x, from.y + 2 * dir);
+            // Check that the two-ahead square is inside AND empty
+            if (OwningBoard->isInside(twoAhead.x, twoAhead.y) &&
+                OwningBoard->getPiece(twoAhead.x, twoAhead.y)->getType() == PieceType::EMPTY)
+            {
+                moves.emplace_back(from, twoAhead);
+            }
         }
     }
+
+    // --- 3. Diagonal Captures ---
+    for (int dx : {-1, 1}) { // Check diagonal left (dx=-1) and diagonal right (dx=1)
+        Position cap(from.x + dx, from.y + dir); // Diagonal move changes X (column) and Y (row)
+
+        if (OwningBoard->isInside(cap.x, cap.y)) {
+            Piece* target = OwningBoard->getPiece(cap.x, cap.y);
+
+            // Legal capture condition: The square is occupied AND the piece is the opponent's color
+            if (target->getType() != PieceType::EMPTY && target->getColor() != color) {
+                moves.emplace_back(from, cap, MoveType::CAPTURE);
+            }
+        }
+    }
+
+    // Note: En passant and promotion are complex and not included here.
+
     return moves;
 }
 

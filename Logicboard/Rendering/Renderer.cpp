@@ -1,9 +1,12 @@
-#include "Renderer.hpp"
 #define STB_IMAGE_IMPLEMENTATION
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include "Renderer.hpp"
 #include "stb_image.h"
 #include "imgui/imgui.h"
+using namespace Renderer;
 
-GLuint Renderer::compileShader(const char* path, GLenum type) {
+GLuint compileShader(const char* path, GLenum type) {
     std::ifstream file(path);
     if (!file.is_open()) {
         std::cerr << "Could not open shader file: " << path << std::endl;
@@ -25,6 +28,37 @@ GLuint Renderer::compileShader(const char* path, GLenum type) {
     }
     return shader;
 }
+
+GLuint Renderer::compileShader(const char* path, GLenum type)
+{
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        std::cerr << "Could not open shader file: " << path << std::endl;
+        return 0;
+    }
+
+    std::string source(
+        (std::istreambuf_iterator<char>(file)),
+        std::istreambuf_iterator<char>()
+    );
+    const char* src = source.c_str();
+
+    GLuint shader = glCreateShader(type);
+    glShaderSource(shader, 1, &src, nullptr);
+    glCompileShader(shader);
+
+    GLint success;
+    GLchar infoLog[512];
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if (!success) {
+        glGetShaderInfoLog(shader, 512, nullptr, infoLog);
+        std::cerr << "ERROR::SHADER_COMPILATION_FAILED (" << path << ")\n"
+            << infoLog << std::endl;
+    }
+
+    return shader;
+}
+
 
 GLuint Renderer::createShaderProgram(const char* vertexPath, const char* fragmentPath) {
     GLuint vertex = compileShader(vertexPath, GL_VERTEX_SHADER);
@@ -73,39 +107,13 @@ Renderer::ShaderRenderer::ShaderRenderer(const char* vertexPath, const char* fra
     }
 }
 
-Renderer::ShaderRenderer::~ShaderRenderer() {
-    // Delete per-frame/scene vertex objects
-    clearVertexObjects();
 
-    // Delete constant objects too (they're used for background/board)
-    for (const auto& obj : constantObjs) {
-        if (obj.VAO) glDeleteVertexArrays(1, &obj.VAO);
-        if (obj.VBO) glDeleteBuffers(1, &obj.VBO);
-        if (obj.EBO) glDeleteBuffers(1, &obj.EBO);
-        if (obj.textured && obj.textureID) glDeleteTextures(1, &obj.textureID);
-    }
-    constantObjs.clear();
-
-    // If you have a textureCache, delete those textures now:
-    for (auto& kv : textureCache) {
-        if (kv.second) glDeleteTextures(1, &kv.second);
-    }
-    textureCache.clear();
-
-    if (shaderProgram) {
-        glDeleteProgram(shaderProgram);
-        shaderProgram = 0;
-    }
-}
-
-void Renderer::ShaderRenderer::setupTriangle(const Vertex& v1, const Vertex& v2, const Vertex& v3) {
+Renderer::VertexObject Renderer::ShaderRenderer::setupTriangle(const Vertex& v1, const Vertex& v2, const Vertex& v3) {
     Vertex vertices[] = { v1, v2, v3 };
 
     GLuint VAO = 0, VBO = 0;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
-
-    vertexObjs.push_back({ VAO, VBO, 0, GL_TRIANGLES, 3, false, 0 });
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -123,9 +131,10 @@ void Renderer::ShaderRenderer::setupTriangle(const Vertex& v1, const Vertex& v2,
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+    return VertexObject{ VAO, VBO, 0, GL_TRIANGLES, 3, false, 0 };
 }
 
-void Renderer::ShaderRenderer::setupQuad(float x, float y, float width, float height, const char* texturePath) {
+Renderer::VertexObject Renderer::ShaderRenderer::setupQuad(float x, float y, float width, float height, const char* texturePath) {
     float left = x, right = x + width;
     float bottom = y, top = y + height;
 
@@ -152,7 +161,6 @@ void Renderer::ShaderRenderer::setupQuad(float x, float y, float width, float he
         else std::cerr << "Renderer::setupQuad: texture load failed: " << texturePath << std::endl;
     }
 
-    vertexObjs.push_back({ VAO, VBO, EBO, GL_TRIANGLES, 6, textured, texture });
 
     glBindVertexArray(VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
@@ -172,11 +180,12 @@ void Renderer::ShaderRenderer::setupQuad(float x, float y, float width, float he
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+    return VertexObject{ VAO, VBO, EBO, GL_TRIANGLES, 6, textured, texture };
 }
 
-void Renderer::ShaderRenderer::clearVertexObjects() {
+void Renderer::ShaderRenderer::clearVertexObjects(std::vector<VertexObject>& objs) {
     // Delete GPU resources for vertexObjs
-    for (const auto& obj : vertexObjs) {
+    for (const auto& obj : objs) {
         if (obj.VAO) glDeleteVertexArrays(1, &obj.VAO);
         if (obj.VBO) glDeleteBuffers(1, &obj.VBO);
         if (obj.EBO) glDeleteBuffers(1, &obj.EBO);
@@ -187,31 +196,12 @@ void Renderer::ShaderRenderer::clearVertexObjects() {
             // glDeleteTextures(1, &obj.textureID);
         }
     }
-    vertexObjs.clear();
+    objs.clear();
 }
 
-void Renderer::ShaderRenderer::renderConstants() {
+void Renderer::ShaderRenderer::render(std::vector<VertexObject> objs) {
     glUseProgram(shaderProgram);
-    for (const auto& obj : constantObjs) {
-        glUniform1i(glGetUniformLocation(shaderProgram, "useTexture"), obj.textured ? 1 : 0);
-        if (obj.textured) {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, obj.textureID);
-            glUniform1i(glGetUniformLocation(shaderProgram, "tex"), 0); // texture unit 0
-        }
-        glBindVertexArray(obj.VAO);
-        if (obj.EBO)
-            glDrawElements(obj.type, obj.vertexCount, GL_UNSIGNED_INT, 0);
-        else
-            glDrawArrays(obj.type, 0, obj.vertexCount);
-        glBindVertexArray(0);
-    }
-}
-
-
-void Renderer::ShaderRenderer::render() {
-    glUseProgram(shaderProgram);
-    for (const auto& obj : vertexObjs) {
+    for (const auto& obj : objs) {
         glUniform1i(glGetUniformLocation(shaderProgram, "useTexture"), obj.textured ? 1 : 0);
 
         if (obj.textured) {
@@ -230,7 +220,7 @@ void Renderer::ShaderRenderer::render() {
 
 }
 
-void Renderer::ShaderRenderer::setupColoredRect(float x, float y, float width, float height, const Vec3& color) {
+Renderer::VertexObject Renderer::ShaderRenderer::setupColoredRect(float x, float y, float width, float height, const Vec3& color) {
     // Define four vertices for the rectangle
     Vertex vertices[] = {
         {{x,           y,            0.0f}, color, {0.0f, 0.0f}}, // bottom-left
@@ -246,7 +236,6 @@ void Renderer::ShaderRenderer::setupColoredRect(float x, float y, float width, f
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
 
-    constantObjs.push_back({ VAO, VBO, EBO, GL_TRIANGLES, 6, false, 0 });
 
     glBindVertexArray(VAO);
 
@@ -264,6 +253,7 @@ void Renderer::ShaderRenderer::setupColoredRect(float x, float y, float width, f
     glEnableVertexAttribArray(2);
 
     glBindVertexArray(0);
+    return VertexObject{ VAO, VBO, EBO, GL_TRIANGLES, 6, false, 0 };
 }
 
 
@@ -320,6 +310,7 @@ void Renderer::ShaderRenderer::setUniformMat4(const std::string& name, const glm
     }
     glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(mat));
 }
+
 
 
  void Renderer::SetupImGuiStyle()
