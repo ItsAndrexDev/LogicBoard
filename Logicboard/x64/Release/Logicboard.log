@@ -1,7 +1,33 @@
-﻿  Generating code
-  42 of 2392 functions ( 1.8%) were compiled, the rest were copied from previous compilation.
-    1 functions were new in current compilation
-    42 functions had inline decision re-evaluated but remain unchanged
+﻿  Chess.cpp
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\shared\minwindef.h(130,9): warning C4005: 'APIENTRY': macro redefinition
+  (compiling source file 'Functionality/Chess.cpp')
+      D:\vcpkg\installed\x64-windows\include\GLFW\glfw3.h(123,11):
+      see previous definition of 'APIENTRY'
+  
+  Misc.cpp
+  Main.cpp
+C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\shared\minwindef.h(130,9): warning C4005: 'APIENTRY': macro redefinition
+  (compiling source file 'Main.cpp')
+      D:\vcpkg\installed\x64-windows\include\GLFW\glfw3.h(123,11):
+      see previous definition of 'APIENTRY'
+  
+C:\Users\simon\Desktop\LogicBoard\Logicboard\Main.cpp(49,33): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\simon\Desktop\LogicBoard\Logicboard\Main.cpp(50,33): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+C:\Users\simon\Desktop\LogicBoard\Logicboard\Main.cpp(250,51): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\simon\Desktop\LogicBoard\Logicboard\Main.cpp(250,40): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\simon\Desktop\LogicBoard\Logicboard\Main.cpp(251,39): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+C:\Users\simon\Desktop\LogicBoard\Logicboard\Main.cpp(251,32): warning C4244: 'argument': conversion from 'int' to 'float', possible loss of data
+  imgui.cpp
+  imgui_draw.cpp
+  imgui_impl_glfw.cpp
+  imgui_impl_opengl3.cpp
+  imgui_tables.cpp
+  imgui_widgets.cpp
+  Renderer.cpp
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+C:\Users\simon\Desktop\LogicBoard\Logicboard\Functionality\Chess.cpp(91): warning C4715: 'Chess::Board::kingPosition': not all control paths return a value
+  All 4034 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   Finished generating code
   Logicboard.vcxproj -> C:\Users\simon\Desktop\LogicBoard\x64\Release\Logicboard.exe
   'pwsh.exe' is not recognized as an internal or external command,

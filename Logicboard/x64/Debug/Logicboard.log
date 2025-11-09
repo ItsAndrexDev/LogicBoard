@@ -1,5 +1,0 @@
-﻿  Chess.cpp
-C:\Users\simon\Desktop\LogicBoard\Logicboard\Chess.cpp(89,1): warning C4715: 'Chess::Board::kingPosition': not all control paths return a value
-  Logicboard.vcxproj -> C:\Users\simon\Desktop\LogicBoard\x64\Debug\Logicboard.exe
-  'pwsh.exe' is not recognized as an internal or external command,
-  operable program or batch file.

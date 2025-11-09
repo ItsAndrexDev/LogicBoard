@@ -1,24 +1,29 @@
+#define GLFW_INCLUDE_NONE
+#include <iostream>
 #include <GL/glew.h> // MUST be included before GLFW
 #include <GLFW/glfw3.h>
 #include "Rendering/Renderer.hpp"
-#include "GameFunctions.hpp"
-#include <iostream>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include "Chess.hpp"
-#include <string>
 #include "Rendering/imgui/imgui.h"
 #include "Rendering/imgui/imgui_impl_glfw.h"
 #include "Rendering/imgui/imgui_impl_opengl3.h"
+#include "Functionality/Misc.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include "Functionality/Chess.hpp"
+#include <string>
 #include <optional>
 #include <algorithm>
+#include <atomic>
+#include <thread>
 const int GRID_SIZE = 8;
 float tileSize = 2.0f / GRID_SIZE;
 
+std::thread networkingThread;
+std::atomic<bool> networkThreadActive{ true };
 
 std::unique_ptr<Renderer::ShaderRenderer> renderer;
-
+Networking::NetworkManager netMgr;
 
 
 Chess::Board chessBoard;
@@ -50,6 +55,15 @@ inline void drawDragging(int width, int height, double xpos, double ypos) {
                 );
             }
         }
+    }
+}
+
+void updateGameInfoFromNetwork(const Chess::GameInfo& gameInfo) {
+    chessBoard.currentTurn = gameInfo.currentTurn;
+    chessBoard.gameState = gameInfo.gameState;
+	chessBoard.makeMove(gameInfo.lastMove.from, gameInfo.lastMove.to, takenPieces);
+    if (gameInfo.lastMove == chessBoard.lastMove) {
+		std::cout << "Successfully updated game state from network.\n";
     }
 }
 
@@ -133,7 +147,7 @@ int main() {
     GLFWmonitor* monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode* mode = glfwGetVideoMode(monitor);
 
-    GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Logicboard", monitor, nullptr);
+    GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "Logicboard", nullptr, nullptr);
     if (!window) {
         glfwTerminate();
         return -1;
@@ -281,12 +295,40 @@ int main() {
             }
             if (ImGui::Button("Host Online Game", ImVec2(200, 50)))
             {
+				networkThreadActive.store(true);
+                networkingThread = std::thread([&]() {
+                    netMgr.startServer(4275);
+                    while (networkThreadActive) {
+                        try {
+                            updateGameInfoFromNetwork(netMgr.receiveData<Chess::GameInfo>());
+                        }
+                        catch (...) {
+
+                        }
+                    }
+				});
 
             }
+            char ip[128] = "localhost";
+			//ImGui::InputText("Enter IP", ip, IM_ARRAYSIZE(ip));
             if (ImGui::Button("Join Online Game", ImVec2(200, 50))) {
-
+				networkThreadActive.store(true);
+                networkingThread = std::thread([&, ip]() {
+                    netMgr.startClient(std::string(ip), 4275);
+                    while (networkThreadActive) {
+                        try {
+                            updateGameInfoFromNetwork(netMgr.receiveData<Chess::GameInfo>());
+                        }
+                        catch (...) {
+                        }
+                    }
+                });
+				//
+				netMgr.startClient("localhost", 4275);
             }
-
+            if(ImGui::Button("Stop Network Activities", ImVec2(200, 50))) {
+				networkThreadActive.store(false);
+			}
             ImGui::PopFont();
 
         }
@@ -300,6 +342,10 @@ int main() {
 
 
         if (ImGui::Button("Quit", ImVec2(200, 50))) {
+            networkThreadActive.store(false);
+            if (networkingThread.joinable())
+                networkingThread.join();
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
             return 0;
         }
 
