@@ -5,7 +5,23 @@
 #include <string>
 #include <iostream>
 #include <cstring>
+#include <chrono>
+std::string discoverServer(asio::io_context& ioContext, unsigned short port, int timeoutMs = 1000);
 namespace Networking {
+    class UDPDiscoveryServer {
+    public:
+        UDPDiscoveryServer(asio::io_context& ioContext, unsigned short port)
+            : socket_(ioContext, asio::ip::udp::endpoint(asio::ip::udp::v4(), port)) {
+            startReceive();
+        }
+
+    private:
+        void startReceive();
+
+        asio::ip::udp::socket socket_;
+        asio::ip::udp::endpoint remoteEndpoint_;
+        std::array<char, 1024> recvBuffer_;
+    };
 	class NetworkManager {
 	public:
 		NetworkManager();

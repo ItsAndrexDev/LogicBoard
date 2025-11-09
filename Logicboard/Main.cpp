@@ -1,11 +1,12 @@
 #define GLFW_INCLUDE_NONE
 #include <iostream>
-#include <GL/glew.h> // MUST be included before GLFW
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include "Rendering/Renderer.hpp"
 #include "Rendering/imgui/imgui.h"
 #include "Rendering/imgui/imgui_impl_glfw.h"
 #include "Rendering/imgui/imgui_impl_opengl3.h"
+#include "Rendering/imgui/imgui_stdlib.h"
 #include "Functionality/Misc.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -20,7 +21,8 @@ const int GRID_SIZE = 8;
 float tileSize = 2.0f / GRID_SIZE;
 
 std::thread networkingThread;
-std::atomic<bool> networkThreadActive{ true };
+std::thread discoveryThread;
+bool networkThreadActive = false;
 
 std::unique_ptr<Renderer::ShaderRenderer> renderer;
 Networking::NetworkManager netMgr;
@@ -174,6 +176,10 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
 
 
 int main() {
+
+    system("netsh advfirewall firewall add rule name=\"Allow Port 4275\" dir=in action=allow protocol=TCP localport=4275");
+    system("netsh advfirewall firewall add rule name=\"Allow Port 4275\" dir=in action=allow protocol=UDP localport=4275");
+
     // --- GLFW init ---
     if (!glfwInit())
         return -1;
@@ -305,7 +311,7 @@ int main() {
 
 
         
-        ImGui::Text(chessBoard.currentTurn == Chess::PieceColor::WHITE ?
+        ImGui::Text(chessBoard.currentTurn == localPlayerColor ?
             "White's Turn!" : "Black's Turn!");
         if (ImGui::Button("Reset Board")) {
             chessBoard.resetBoard();
@@ -332,14 +338,18 @@ int main() {
                 chessBoard.gameState = Chess::GameState::ONGOING;
 				localPlayerColor = Chess::PieceColor::NONE;
             }
+
+
             if (ImGui::Button("Host Online Game", ImVec2(200, 50)))
             {
-				networkThreadActive.store(true);
+				networkThreadActive = true;
                 localPlayerColor = Chess::PieceColor::WHITE;
                 networkingThread = std::thread([&]() {
                     netMgr.startServer(4275);
 					chessBoard.gameState = Chess::GameState::ONGOING;
-                    while (networkThreadActive) {
+                    for(;;) {
+						if (!networkThreadActive)
+							break;
                         try {
                             updateGameInfoFromNetwork(netMgr.receiveData<Chess::GameInfo>());
                         }
@@ -348,18 +358,31 @@ int main() {
                         }
                     }
 				});
-				
+                discoveryThread = std::thread([&]() {
+                    asio::io_context ioContext;
+                    Networking::UDPDiscoveryServer discoveryServer(ioContext, 4275);
+                    ioContext.run();
+
+
+                    });
 
             }
-            char ip[128] = "localhost";
-			//ImGui::InputText("Enter IP", ip, IM_ARRAYSIZE(ip));
             if (ImGui::Button("Join Online Game", ImVec2(200, 50))) {
-				networkThreadActive.store(true);
+				networkThreadActive = true;
                 localPlayerColor = Chess::PieceColor::BLACK;
-                networkingThread = std::thread([&, ip]() {
-                    netMgr.startClient(std::string(ip), 4275);
+                networkingThread = std::thread([&]() {
+                    asio::io_context ioContext;
+                    std::string serverIP = Networking::discoverServer(ioContext, 4275, 3000);
+                    if(serverIP.empty()) {
+                        std::cout << "No server found!\n";
+                        networkThreadActive = false;
+                        return;
+					}
+                    netMgr.startClient(std::string(serverIP), 4275);
 					chessBoard.gameState = Chess::GameState::ONGOING;
-                    while (networkThreadActive) {
+                    for (;;) {
+                        if(!networkThreadActive) 
+							break;
                         try {
                             updateGameInfoFromNetwork(netMgr.receiveData<Chess::GameInfo>());
                         }
@@ -369,7 +392,7 @@ int main() {
                 });
             }
             if(ImGui::Button("Stop Network Activities", ImVec2(200, 50))) {
-				networkThreadActive.store(false);
+				networkThreadActive = false;
 			}
             ImGui::PopFont();
 
@@ -384,10 +407,6 @@ int main() {
 
 
         if (ImGui::Button("Quit", ImVec2(200, 50))) {
-            networkThreadActive.store(false);
-            if (networkingThread.joinable())
-                networkingThread.join();
-            glfwSetWindowShouldClose(window, GLFW_TRUE);
             return 0;
         }
 

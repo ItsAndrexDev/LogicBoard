@@ -9,16 +9,33 @@
 #include <string>
 #include <iostream>
 #include <cstring>
-
+#include <windows.h>
+#include <shellapi.h>
 namespace Chess { class Piece; struct Position; }
 
 std::string retrievePath(Chess::Piece* piece);
 Chess::Position screenToWorld(double mouseX, double mouseY, int windowWidth, int windowHeight, float tileSize, int GRID_SIZE);
 
 
+bool AllowPortThroughFirewall(int port, const std::wstring& ruleName = L"ChessServer");
 
 
 namespace Networking {
+    std::string discoverServer(asio::io_context& ioContext, unsigned short port, int timeoutMs = 1000);
+    class UDPDiscoveryServer {
+    public:
+        UDPDiscoveryServer(asio::io_context& ioContext, unsigned short port)
+            : socket_(ioContext, asio::ip::udp::endpoint(asio::ip::udp::v4(), port)) {
+            startReceive();
+        }
+
+    private:
+        void startReceive();
+
+        asio::ip::udp::socket socket_;
+        asio::ip::udp::endpoint remoteEndpoint_;
+        std::array<char, 1024> recvBuffer_;
+    };
     class NetworkManager {
     public:
         NetworkManager();

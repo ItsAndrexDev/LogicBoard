@@ -45,6 +45,9 @@
     <ClCompile Include="Functionality\Misc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Rendering\imgui\imgui_stdlib.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Rendering\Renderer.hpp">
@@ -1965,6 +1968,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="asio\asio.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\imgui\imgui_stdlib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

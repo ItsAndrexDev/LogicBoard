@@ -80,3 +80,84 @@ namespace Networking {
 
 
 } // namespace Networking
+
+
+
+bool AllowPortThroughFirewall(int port, const std::wstring& ruleName) {
+    wchar_t command[256];
+    swprintf_s(command,
+        L"netsh advfirewall firewall add rule name=\"%s\" dir=in action=allow protocol=TCP localport=%d",
+        ruleName.c_str(), port);
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.lpVerb = L"runas"; // Run as admin
+    sei.lpFile = L"cmd.exe";
+    sei.lpParameters = (std::wstring(L"/c ") + command).c_str();
+    sei.nShow = SW_HIDE; // or SW_SHOW if you want to see it
+    sei.fMask = SEE_MASK_NOASYNC | SEE_MASK_NOCLOSEPROCESS;
+
+    if (!ShellExecuteExW(&sei)) {
+        std::wcerr << L"Failed to request admin privileges or execute command.\n";
+        return false;
+    }
+
+	Sleep(3000); // Wait a bit for the command to take effect
+    DWORD exitCode = 1;
+    GetExitCodeProcess(sei.hProcess, &exitCode);
+    CloseHandle(sei.hProcess);
+    if (exitCode == 0) {
+        std::wcout << L"Firewall rule added successfully.\n";
+        return true;
+    }
+    else {
+        std::wcerr << L"Failed to add firewall rule (exit code " << exitCode << L").\n";
+        return false;
+    }
+}
+
+std::string Networking::discoverServer(asio::io_context& ioContext, unsigned short port, int timeoutMs) {
+    asio::ip::udp::socket socket(ioContext);
+    socket.open(asio::ip::udp::v4());
+
+    // Enable broadcast
+    socket.set_option(asio::socket_base::broadcast(true));
+
+    asio::ip::udp::endpoint broadcastEndpoint(asio::ip::address_v4::broadcast(), port);
+
+    // Send discovery message
+    std::string discoverMsg = "DISCOVER_CHESS_SERVER";
+    socket.send_to(asio::buffer(discoverMsg), broadcastEndpoint);
+
+    // Wait for reply
+    socket.non_blocking(true);
+    auto start = std::chrono::steady_clock::now();
+    asio::ip::udp::endpoint serverEndpoint;
+
+    std::array<char, 1024> recvBuffer;
+    while (std::chrono::steady_clock::now() - start < std::chrono::milliseconds(timeoutMs)) {
+        std::error_code ec;
+        std::size_t len = socket.receive_from(asio::buffer(recvBuffer), serverEndpoint, 0, ec);
+        if (!ec && len > 0) {
+            std::string reply(recvBuffer.data(), len);
+            if (reply == "CHESS_SERVER_HERE") {
+                return serverEndpoint.address().to_string();
+            }
+        }
+    }
+
+    return ""; // not found
+}
+
+void Networking::UDPDiscoveryServer::startReceive() {
+    socket_.async_receive_from(
+        asio::buffer(recvBuffer_), remoteEndpoint_,
+        [this](std::error_code ec, std::size_t bytesRecv) {
+            if (!ec) {
+                std::string msg(recvBuffer_.data(), bytesRecv);
+                if (msg == "DISCOVER_CHESS_SERVER") {
+                    std::string reply = "CHESS_SERVER_HERE";
+                    socket_.send_to(asio::buffer(reply), remoteEndpoint_);
+                }
+            }
+            startReceive();
+        });
+}
