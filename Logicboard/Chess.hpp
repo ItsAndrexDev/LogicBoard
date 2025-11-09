@@ -9,7 +9,7 @@ namespace Chess {
     enum class PieceType { EMPTY = 0, PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING };
     enum class PieceColor { NONE = 0, WHITE, BLACK };
     enum class MoveType { NORMAL = 0, CAPTURE, CASTLE, PROMOTION, EN_PASSANT };
-
+	enum class GameState { ONGOING = 0, PAUSED, CHECK, CHECKMATE, STALEMATE };
 	class Board; // Forward declaration
 
     struct Position {
@@ -114,9 +114,13 @@ namespace Chess {
         void makeMove(Position from, Position to, std::vector<std::unique_ptr<Piece>>& takenPieces);
         bool isSquareAttacked(Position pos, PieceColor attackerColor) const;
 		Position kingPosition(PieceColor kingColor) const;
-		bool isChecked(PieceColor kingColor) const;
+		bool isChecked(PieceColor kingColor);
         void resetBoard();
+		void updateGameState();
+        void gameOver();
+
 		PieceColor currentTurn = PieceColor::WHITE;
+		GameState gameState = GameState::PAUSED;
     };
 
 } // namespace Chess

@@ -9,6 +9,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <unordered_map>
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_opengl3.h"
+#include "imgui/imgui_impl_glfw.h"
 struct Vec2 {
     float x, y;
     Vec2(float a = 0, float b = 0)
@@ -54,6 +57,21 @@ namespace Renderer {
     };
 
 
+    inline void TextCentered(const char* text)
+    {
+        // Get window width and the text width
+        float windowWidth = ImGui::GetWindowSize().x;
+        float textWidth = ImGui::CalcTextSize(text).x;
+
+        // Compute horizontal offset
+        float offsetX = (windowWidth - textWidth) * 0.5f;
+
+        // Move the cursor and draw text
+        if (offsetX > 0.0f)
+            ImGui::SetCursorPosX(offsetX);
+        ImGui::TextUnformatted(text);
+    }
+
     GLuint compileShader(const char* path, GLenum type);
     GLuint createShaderProgram(const char* vertexPath, const char* fragmentPath);
 
@@ -84,3 +102,4 @@ namespace Renderer {
     };
 
 }
+

@@ -3,7 +3,6 @@ using namespace Chess;
 
 Board::Board() {
     resetBoard();
-	currentTurn = PieceColor::WHITE;
 }
 
 void Board::makeMove(Position from, Position to, std::vector<std::unique_ptr<Piece>>& takenPieces) {
@@ -11,6 +10,9 @@ void Board::makeMove(Position from, Position to, std::vector<std::unique_ptr<Pie
     auto& dest = grid[to.x][to.y];
 	if (piece->getColor() != currentTurn) 
 		return;
+
+    if (gameState == GameState::PAUSED)
+        return;
 
     std::vector<Move> legalMoves = piece->getLegalMoves(from);
 	std::cout << "Legal moves for piece at (" << from.x << ", " << from.y << "):\n";
@@ -30,20 +32,18 @@ void Board::makeMove(Position from, Position to, std::vector<std::unique_ptr<Pie
         }
 	}
     if (!isLegal) return;
-    if (isChecked(currentTurn)) {
-        // Simulate the move
-        auto capturedPiece = std::move(dest);
-        dest = std::move(piece);
-        piece = std::make_unique<EmptyPiece>(this);
-        bool stillInCheck = isChecked(currentTurn);
-        // Revert the move
-        piece = std::move(dest);
-        dest = std::move(capturedPiece);
-        if (stillInCheck) {
-            std::cout << "Move would leave king in check, illegal move.\n";
-            return; // Move is illegal as it leaves king in check
-		}
-    }
+    // Simulate the move
+    auto capturedPiece = std::move(dest);
+    dest = std::move(piece);
+    piece = std::make_unique<EmptyPiece>(this);
+    bool stillInCheck = isChecked(currentTurn);
+    // Revert the move
+    piece = std::move(dest);
+    dest = std::move(capturedPiece);
+    if (stillInCheck) {
+        std::cout << "Move would leave king in check, illegal move.\n";
+        return; // Move is illegal as it leaves king in check
+	}
     std::cout << "Move made from (" << from.x << ", " << from.y << ") to ("
 		<< to.x << ", " << to.y << ")\n";
     if(usedMove.type == MoveType::CAPTURE)
@@ -53,6 +53,7 @@ void Board::makeMove(Position from, Position to, std::vector<std::unique_ptr<Pie
     piece = std::make_unique<EmptyPiece>(this);
 	currentTurn = (currentTurn == PieceColor::WHITE) ? PieceColor::BLACK : PieceColor::WHITE;
 	std::cout << "taken pieces count: " << takenPieces.size() << "\n";
+	updateGameState();
 }
 
 bool Board::isSquareAttacked(Position pos, PieceColor attackerColor) const {
@@ -86,12 +87,60 @@ Position Board::kingPosition(PieceColor kingColor) const {
         }
 	}
 }
-bool Board::isChecked(PieceColor kingColor) const {
-    return isSquareAttacked(kingPosition(kingColor),kingColor == PieceColor::WHITE ? PieceColor::BLACK : PieceColor::WHITE);
+bool Board::isChecked(PieceColor kingColor) {
+    bool isCheck = isSquareAttacked(kingPosition(kingColor), kingColor == PieceColor::WHITE ? PieceColor::BLACK : PieceColor::WHITE);
+    return isCheck;
+}
+
+void Board::updateGameState() {
+    bool inCheck = isChecked(currentTurn);
+    bool hasLegalMoves = false;
+    // Check for any legal moves for the current player
+    for (int x = 0; x < 8; ++x) {
+        for (int y = 0; y < 8; ++y) {
+            Piece* piece = getPiece(x, y);
+            if (piece->getColor() == currentTurn) {
+                Position from{x, y};
+                std::vector<Move> moves = piece->getLegalMoves(from);
+                for (const Move& move : moves) {
+                    // Simulate the move
+                    auto capturedPiece = std::move(grid[move.to.x][move.to.y]);
+                    grid[move.to.x][move.to.y] = std::move(grid[from.x][from.y]);
+                    grid[from.x][from.y] = std::make_unique<EmptyPiece>(this);
+                    bool stillInCheck = isChecked(currentTurn);
+                    // Revert the move
+                    grid[from.x][from.y] = std::move(grid[move.to.x][move.to.y]);
+                    grid[move.to.x][move.to.y] = std::move(capturedPiece);
+                    if (!stillInCheck) {
+                        hasLegalMoves = true;
+                        break;
+                    }
+                }
+            }
+            if (hasLegalMoves) break;
+        }
+        if (hasLegalMoves) break;
+    }
+    if (inCheck && !hasLegalMoves) {
+        gameState = GameState::CHECKMATE;
+        gameOver();
+    } else if (!inCheck && !hasLegalMoves) {
+        gameState = GameState::STALEMATE;
+        gameOver();
+    } else if (inCheck) {
+        gameState = GameState::CHECK;
+    } else {
+        gameState = GameState::ONGOING;
+	}
+}
+
+void Board::gameOver() {
+    
 }
 
 
 void Board::resetBoard() {
+    currentTurn = PieceColor::WHITE;
     // Fill everything with empty pieces first
     for (int x = 0; x < 8; ++x)
         for (int y = 0; y < 8; ++y)

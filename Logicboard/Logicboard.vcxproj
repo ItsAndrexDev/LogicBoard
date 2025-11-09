@@ -126,6 +126,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Chess.cpp" />
+    <ClCompile Include="GameFunctions.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Rendering\imgui\imgui.cpp" />
     <ClCompile Include="Rendering\imgui\imgui_draw.cpp" />
@@ -137,6 +138,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Chess.hpp" />
+    <ClInclude Include="GameFunctions.hpp" />
     <ClInclude Include="Rendering\imgui\imconfig.h" />
     <ClInclude Include="Rendering\imgui\imgui.h" />
     <ClInclude Include="Rendering\imgui\imgui_impl_glfw.h" />

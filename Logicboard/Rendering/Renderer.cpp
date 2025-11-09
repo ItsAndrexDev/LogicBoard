@@ -3,7 +3,6 @@
 #define NOMINMAX
 #include "Renderer.hpp"
 #include "stb_image.h"
-#include "imgui/imgui.h"
 using namespace Renderer;
 
 GLuint compileShader(const char* path, GLenum type) {
@@ -404,3 +403,4 @@ void Renderer::ShaderRenderer::setUniformMat4(const std::string& name, const glm
     style.Colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.196078434586525f, 0.1764705926179886f, 0.5450980663299561f, 0.501960813999176f);
     style.Colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.196078434586525f, 0.1764705926179886f, 0.5450980663299561f, 0.501960813999176f);
 }
+
