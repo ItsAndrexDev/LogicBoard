@@ -25,7 +25,6 @@ std::atomic<bool> networkThreadActive{ true };
 std::unique_ptr<Renderer::ShaderRenderer> renderer;
 Networking::NetworkManager netMgr;
 
-
 Chess::Board chessBoard;
 
 std::vector<Renderer::VertexObject> tileVertexObjects;
@@ -34,7 +33,7 @@ Renderer::VertexObject draggedPieceVertexObject;
 Chess::Position draggedFromPos;
 Chess::Position draggedToPos;
 bool isDragging = false;
-
+Chess::PieceColor localPlayerColor;
 
 inline void drawDragging(int width, int height, double xpos, double ypos) {
     for (int y = 0; y < GRID_SIZE; y++) {
@@ -60,16 +59,33 @@ inline void drawDragging(int width, int height, double xpos, double ypos) {
 
 void updateGameInfoFromNetwork(const Chess::GameInfo& gameInfo) {
     chessBoard.currentTurn = gameInfo.currentTurn;
+
     chessBoard.gameState = gameInfo.gameState;
-	chessBoard.makeMove(gameInfo.lastMove.from, gameInfo.lastMove.to, takenPieces);
-    if (gameInfo.lastMove == chessBoard.lastMove) {
-		std::cout << "Successfully updated game state from network.\n";
-    }
+    if (chessBoard.gameState == Chess::GameState::PAUSED)
+        chessBoard.gameState = Chess::GameState::ONGOING;
+
+    chessBoard.lastMove = gameInfo.lastMove;
+
+    auto& piece = chessBoard.grid[chessBoard.lastMove.from.x][GRID_SIZE - 1 - chessBoard.lastMove.from.y];
+
+    auto& dest = chessBoard.grid[chessBoard.lastMove.to.x][GRID_SIZE - 1 - chessBoard.lastMove.to.y];
+
+
+    if (chessBoard.lastMove.type == Chess::MoveType::CAPTURE)
+        takenPieces.push_back(std::move(dest));
+
+    dest = std::move(piece);
+    // Leave an empty piece at the original square
+    piece = std::make_unique<Chess::EmptyPiece>(&chessBoard);
+
+    std::cout << "localPlayerColor=" << (localPlayerColor == Chess::PieceColor::WHITE ? "WHITE" : "BLACK")
+        << ", currentTurn=" << (chessBoard.currentTurn == Chess::PieceColor::WHITE ? "WHITE" : "BLACK")
+        << std::endl;
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if(chessBoard.gameState == Chess::GameState::PAUSED)
-		return;
+    if (chessBoard.gameState == Chess::GameState::PAUSED)
+        return;
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
@@ -80,15 +96,37 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 
         // Check if the position is valid AND there is a piece
         if (worldPos.x >= 0 && worldPos.y >= 0 &&
-			chessBoard.getPiece(worldPos.x, worldPos.y)->getType() != Chess::PieceType::EMPTY &&
-            chessBoard.currentTurn == chessBoard.getPiece(worldPos.x, worldPos.y)->getColor() && !isDragging)
+            chessBoard.getPiece(worldPos.x, worldPos.y)->getType() != Chess::PieceType::EMPTY && !isDragging)
         {
-			std::cout << "Grabbing\n";
-			draggedFromPos = worldPos;
-            draggedToPos = worldPos;
-			isDragging = true;
-			chessBoard.getPiece(worldPos.x, worldPos.y)->isVisible = false;
-			drawDragging(width, height, xpos, ypos);
+            if (localPlayerColor == Chess::PieceColor::NONE) {
+                std::cout << "Grabbing\n";
+                draggedFromPos = worldPos;
+                draggedToPos = worldPos;
+                isDragging = true;
+                chessBoard.getPiece(worldPos.x, worldPos.y)->isVisible = false;
+                drawDragging(width, height, xpos, ypos);
+            }
+            else if (localPlayerColor == Chess::PieceColor::BLACK &&
+                chessBoard.getPiece(worldPos.x, worldPos.y)->getColor() == Chess::PieceColor::WHITE &&
+                chessBoard.currentTurn == Chess::PieceColor::BLACK) {
+
+                    std::cout << "Grabbing\n";
+                    draggedFromPos = worldPos;
+                    draggedToPos = worldPos;
+                    isDragging = true;
+                    chessBoard.getPiece(worldPos.x, worldPos.y)->isVisible = false;
+                    drawDragging(width, height, xpos, ypos);
+            }
+
+            else if (localPlayerColor == Chess::PieceColor::WHITE && chessBoard.getPiece(worldPos.x, worldPos.y)->getColor() == Chess::PieceColor::WHITE) {
+                std::cout << "Grabbing\n";
+                draggedFromPos = worldPos;
+                draggedToPos = worldPos;
+                isDragging = true;
+                chessBoard.getPiece(worldPos.x, worldPos.y)->isVisible = false;
+                drawDragging(width, height, xpos, ypos);
+
+            }
         }
     }
 
@@ -292,12 +330,15 @@ int main() {
             if (ImGui::Button("Start Local Game", ImVec2(200, 50)))
             {
                 chessBoard.gameState = Chess::GameState::ONGOING;
+				localPlayerColor = Chess::PieceColor::NONE;
             }
             if (ImGui::Button("Host Online Game", ImVec2(200, 50)))
             {
 				networkThreadActive.store(true);
+                localPlayerColor = Chess::PieceColor::WHITE;
                 networkingThread = std::thread([&]() {
                     netMgr.startServer(4275);
+					chessBoard.gameState = Chess::GameState::ONGOING;
                     while (networkThreadActive) {
                         try {
                             updateGameInfoFromNetwork(netMgr.receiveData<Chess::GameInfo>());
@@ -307,14 +348,17 @@ int main() {
                         }
                     }
 				});
+				
 
             }
             char ip[128] = "localhost";
 			//ImGui::InputText("Enter IP", ip, IM_ARRAYSIZE(ip));
             if (ImGui::Button("Join Online Game", ImVec2(200, 50))) {
 				networkThreadActive.store(true);
+                localPlayerColor = Chess::PieceColor::BLACK;
                 networkingThread = std::thread([&, ip]() {
                     netMgr.startClient(std::string(ip), 4275);
+					chessBoard.gameState = Chess::GameState::ONGOING;
                     while (networkThreadActive) {
                         try {
                             updateGameInfoFromNetwork(netMgr.receiveData<Chess::GameInfo>());
@@ -323,8 +367,6 @@ int main() {
                         }
                     }
                 });
-				//
-				netMgr.startClient("localhost", 4275);
             }
             if(ImGui::Button("Stop Network Activities", ImVec2(200, 50))) {
 				networkThreadActive.store(false);
@@ -433,6 +475,5 @@ int main() {
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
     glfwTerminate();
-
     return 0;
 }

@@ -9,8 +9,6 @@ Board::Board() {
 void Board::makeMove(Position from, Position to, std::vector<std::unique_ptr<Piece>>& takenPieces) {
     auto& piece = grid[from.x][from.y];
     auto& dest = grid[to.x][to.y];
-	if (piece->getColor() != currentTurn) 
-		return;
 
     if (gameState == GameState::PAUSED)
         return;
@@ -56,6 +54,12 @@ void Board::makeMove(Position from, Position to, std::vector<std::unique_ptr<Pie
 	lastMove = usedMove;
 	std::cout << "taken pieces count: " << takenPieces.size() << "\n";
 	updateGameState();
+
+
+    if (netMgr.isConnected()) {
+        netMgr.sendData<GameInfo>({ lastMove, gameState, currentTurn});
+    }
+
 }
 
 bool Board::isSquareAttacked(Position pos, PieceColor attackerColor) const {
@@ -134,9 +138,7 @@ void Board::updateGameState() {
     } else {
         gameState = GameState::ONGOING;
 	}
-    if(netMgr.isConnected()) {
-		netMgr.sendData<GameInfo>({ lastMove, gameState, currentTurn });
-	}
+    
 }
 
 void Board::gameOver() {
