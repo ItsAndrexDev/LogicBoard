@@ -1,7 +1,7 @@
 #include "Chess.hpp"
 using namespace Chess;
 extern Networking::NetworkManager netMgr;
-
+extern PieceColor localPlayerColor;
 Board::Board() {
     resetBoard();
 }
@@ -48,17 +48,18 @@ void Board::makeMove(Position from, Position to, std::vector<std::unique_ptr<Pie
     if(usedMove.type == MoveType::CAPTURE)
 		takenPieces.push_back(std::move(dest));
     dest = std::move(piece);
+    lastMove = usedMove;
     // Leave an empty piece at the original square
+    
     piece = std::make_unique<EmptyPiece>(this);
 	currentTurn = (currentTurn == PieceColor::WHITE) ? PieceColor::BLACK : PieceColor::WHITE;
-	lastMove = usedMove;
+	
 	std::cout << "taken pieces count: " << takenPieces.size() << "\n";
 	updateGameState();
-
-
     if (netMgr.isConnected()) {
-        netMgr.sendData<GameInfo>({ lastMove, gameState, currentTurn});
+        netMgr.sendData<GameInfo>({ lastMove, gameState, currentTurn });
     }
+
 
 }
 
@@ -147,7 +148,6 @@ void Board::gameOver() {
 
 
 void Board::resetBoard() {
-    currentTurn = PieceColor::WHITE;
     // Fill everything with empty pieces first
     for (int x = 0; x < 8; ++x)
         for (int y = 0; y < 8; ++y)
@@ -184,29 +184,44 @@ void Board::resetBoard() {
     // Kings
     grid[4][0] = std::make_unique<King>(PieceColor::WHITE, this);
     grid[4][7] = std::make_unique<King>(PieceColor::BLACK, this);
+
+    if (localPlayerColor == PieceColor::BLACK) {
+        for(int x = 0; x < 8; ++x) {
+            for(int y = 0; y < 4; ++y) {
+                std::swap(grid[x][y], grid[x][7 - y]);
+            }
+		}
+    }
 }
 
 // ---------------- Pawn ----------------
 std::vector<Move> Pawn::getLegalMoves(const Position& from) const {
     std::vector<Move> moves;
 
-    int dir = (color == PieceColor::WHITE) ? 1 : -1;
 
+    int dir;
+    if (localPlayerColor == PieceColor::WHITE) {
+        dir = (color == PieceColor::WHITE) ? 1 : -1;
+    }
+    else {
+        dir = (color == PieceColor::BLACK) ? 1 : -1;
+    }
     // --- 1. One-Square Forward Move ---
-    Position oneAhead(from.x, from.y + dir); // Move changes the Y-coordinate (row)
-
+    Position oneAhead(from.x, from.y + dir);
     if (OwningBoard->isInside(oneAhead.x, oneAhead.y) &&
         OwningBoard->getPiece(oneAhead.x, oneAhead.y)->getType() == PieceType::EMPTY)
     {
         moves.emplace_back(from, oneAhead);
 
-
-        bool isStartingRank = (color == PieceColor::WHITE && from.y == 1) ||
-            (color == PieceColor::BLACK && from.y == 6);
+        // Two-square move from starting rank
+        bool isStartingRank;
+        if(dir == 1)
+            isStartingRank = (from.y == 1);
+        else
+			isStartingRank = (from.y == 6);
 
         if (isStartingRank) {
             Position twoAhead(from.x, from.y + 2 * dir);
-            // Check that the two-ahead square is inside AND empty
             if (OwningBoard->isInside(twoAhead.x, twoAhead.y) &&
                 OwningBoard->getPiece(twoAhead.x, twoAhead.y)->getType() == PieceType::EMPTY)
             {
@@ -215,21 +230,15 @@ std::vector<Move> Pawn::getLegalMoves(const Position& from) const {
         }
     }
 
-    // --- 3. Diagonal Captures ---
-    for (int dx : {-1, 1}) { // Check diagonal left (dx=-1) and diagonal right (dx=1)
-        Position cap(from.x + dx, from.y + dir); // Diagonal move changes X (column) and Y (row)
-
+    // --- 2. Diagonal Captures ---
+    for (int dx : {-1, 1}) {
+        Position cap(from.x + dx, from.y + dir);
         if (OwningBoard->isInside(cap.x, cap.y)) {
             Piece* target = OwningBoard->getPiece(cap.x, cap.y);
-
-            // Legal capture condition: The square is occupied AND the piece is the opponent's color
-            if (target->getType() != PieceType::EMPTY && target->getColor() != color) {
+            if (target->getType() != PieceType::EMPTY && target->getColor() != color)
                 moves.emplace_back(from, cap, MoveType::CAPTURE);
-            }
         }
     }
-
-    // Note: En passant and promotion are complex and not included here.
 
     return moves;
 }

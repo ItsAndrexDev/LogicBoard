@@ -108,27 +108,16 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
                 chessBoard.getPiece(worldPos.x, worldPos.y)->isVisible = false;
                 drawDragging(width, height, xpos, ypos);
             }
-            else if (localPlayerColor == Chess::PieceColor::BLACK &&
-                chessBoard.getPiece(worldPos.x, worldPos.y)->getColor() == Chess::PieceColor::WHITE &&
-                chessBoard.currentTurn == Chess::PieceColor::BLACK) {
-
-                    std::cout << "Grabbing\n";
-                    draggedFromPos = worldPos;
-                    draggedToPos = worldPos;
-                    isDragging = true;
-                    chessBoard.getPiece(worldPos.x, worldPos.y)->isVisible = false;
-                    drawDragging(width, height, xpos, ypos);
-            }
-
-            else if (localPlayerColor == Chess::PieceColor::WHITE && chessBoard.getPiece(worldPos.x, worldPos.y)->getColor() == Chess::PieceColor::WHITE) {
+            else if (localPlayerColor == chessBoard.getPiece(worldPos.x, worldPos.y)->getColor()
+                && chessBoard.currentTurn == localPlayerColor) {
                 std::cout << "Grabbing\n";
                 draggedFromPos = worldPos;
                 draggedToPos = worldPos;
                 isDragging = true;
                 chessBoard.getPiece(worldPos.x, worldPos.y)->isVisible = false;
                 drawDragging(width, height, xpos, ypos);
-
             }
+
         }
     }
 
@@ -312,7 +301,7 @@ int main() {
 
         
         ImGui::Text(chessBoard.currentTurn == localPlayerColor ?
-            "White's Turn!" : "Black's Turn!");
+            "Your turn!" : "Enemy's Turn!");
         if (ImGui::Button("Reset Board")) {
             chessBoard.resetBoard();
             takenPieces.clear();
@@ -338,7 +327,6 @@ int main() {
                 chessBoard.gameState = Chess::GameState::ONGOING;
 				localPlayerColor = Chess::PieceColor::NONE;
             }
-
 
             if (ImGui::Button("Host Online Game", ImVec2(200, 50)))
             {
@@ -379,6 +367,8 @@ int main() {
                         return;
 					}
                     netMgr.startClient(std::string(serverIP), 4275);
+					chessBoard.resetBoard();
+					chessBoard.currentTurn = Chess::PieceColor::WHITE;
 					chessBoard.gameState = Chess::GameState::ONGOING;
                     for (;;) {
                         if(!networkThreadActive) 
